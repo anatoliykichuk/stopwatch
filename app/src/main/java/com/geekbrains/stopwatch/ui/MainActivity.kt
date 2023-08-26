@@ -2,17 +2,8 @@ package com.geekbrains.stopwatch.ui
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 import com.geekbrains.stopwatch.databinding.ActivityMainBinding
-import com.geekbrains.stopwatch.domain.ElapsedTimeCalculator
-import com.geekbrains.stopwatch.domain.StopwatchListOrchestrator
-import com.geekbrains.stopwatch.domain.StopwatchStateCalculator
-import com.geekbrains.stopwatch.domain.StopwatchStateHolder
-import com.geekbrains.stopwatch.domain.TimestampMillisecondsFormatter
-import com.geekbrains.stopwatch.domain.TimestampProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,25 +11,7 @@ class MainActivity : AppCompatActivity() {
     private val binding
         get() = _binding!!
 
-    private val timestampProvider = object : TimestampProvider {
-        override fun getMilliseconds(): Long {
-            return System.currentTimeMillis()
-        }
-    }
-
-    private val stopwatchListOrchestrator = StopwatchListOrchestrator(
-        StopwatchStateHolder(
-            StopwatchStateCalculator(
-                timestampProvider,
-                ElapsedTimeCalculator(timestampProvider)
-            ),
-            ElapsedTimeCalculator(timestampProvider),
-            TimestampMillisecondsFormatter()
-        ),
-        CoroutineScope(
-            Dispatchers.Main + SupervisorJob()
-        )
-    )
+    private lateinit var viewModel: MainViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,29 +19,33 @@ class MainActivity : AppCompatActivity() {
         _binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        CoroutineScope(
-            Dispatchers.Main + SupervisorJob()
-        ).launch {
-            stopwatchListOrchestrator.ticker.collect {
-                binding.time.text = it
-            }
-        }
+        viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
+
+        viewModel.getLiveData().observe(
+            this@MainActivity, { renderData(it) }
+        )
+
+        viewModel.getData()
 
         binding.startTime.setOnClickListener {
-            stopwatchListOrchestrator.start()
+            viewModel.start()
         }
 
         binding.pauseTime.setOnClickListener {
-            stopwatchListOrchestrator.pause()
+            viewModel.pause()
         }
 
         binding.stopTime.setOnClickListener {
-            stopwatchListOrchestrator.stop()
+            viewModel.stop()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         _binding = null
+    }
+
+    private fun renderData(data: String) {
+        binding.time.text = data
     }
 }
